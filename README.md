@@ -1,4 +1,4 @@
-# Project Template
+# AI_New_Project
 
 ## 🎉 If you already forked the repo ... Welcome to Project Template Repository!
 
