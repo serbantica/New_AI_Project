@@ -58,6 +58,11 @@ test:
 	@echo "🧪 Running tests..."
 	@. .venv/bin/activate && python -m pytest tests/ -v
 
+# 🎯 Run Streamlit Project Charter Tool
+streamlit:
+	@echo "🎯 Starting AI Project Charter Tool..."
+	@. .venv/bin/activate && streamlit run streamlit_app.py --server.port=8501
+
 # 📋 Show available commands
 help:
 	@echo "Available commands:"
@@ -69,10 +74,12 @@ help:
 	@echo "  make devtools  - Install development tools"
 	@echo "  make run       - Run the main application"
 	@echo "  make test      - Run tests"
+	@echo "  make streamlit - Run Streamlit Project Charter Tool"
 	@echo "  make clean     - Clean temporary files"
 	@echo "  make help      - Show this help message"
 	@echo ""
 	@echo "🚀 Quick start for forked repository:"
 	@echo "  1. ./validate_bootstrap.sh"
 	@echo "  2. ./project_bootstrap.sh [project-name]"
-	@echo "  3. make run"
+	@echo "  3. make streamlit  # Run the charter tool"
+	@echo "  4. make run       # Run the main application"

@@ -1,0 +1,58 @@
+{
+  "project_name": "Supply Chain risk management",
+  "problem_statement": "- Delayed or Failed Deliveries Detection\n- Cross-Node Risk Propagation\n- Inventory Risk Visibility",
+  "users": [
+    "Business Users",
+    "Analysts",
+    "Technical Users",
+    "End Customers"
+  ],
+  "interaction_patterns": [
+    "API Calls",
+    "Chat Interface",
+    "Web Dashboard",
+    "Real-time Processing",
+    "Batch Processing"
+  ],
+  "system_components": [
+    "API Gateway",
+    "Data Ingestion",
+    "Data Processing",
+    "ML Models",
+    "Message Queue",
+    "Database"
+  ],
+  "constraints": {
+    "budget": 500,
+    "performance": "< 1 sec",
+    "compliance": []
+  },
+  "success_metrics": {
+    "efficiency_gain": 50,
+    "accuracy_target": 95,
+    "user_adoption": 50
+  },
+  "timeline": {
+    "start_date": "2025-07-07",
+    "end_date": "2025-07-07",
+    "phases": [
+      "Discovery",
+      "Prototype",
+      "Development",
+      "Testing",
+      "Deployment"
+    ]
+  },
+  "chat_history": [],
+  "current_step": "concept",
+  "completion_status": {
+    "Constraints": true,
+    "Success Metrics": true,
+    "Timeline": true,
+    "User Analysis": true,
+    "Architecture": true,
+    "Problem Definition": true,
+    "Interaction Design": true
+  },
+  "tech_stack": "Python + FastAPI"
+}

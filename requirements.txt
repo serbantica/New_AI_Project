@@ -1,0 +1,13 @@
+# Core dependencies for AI Project Charter Tool
+streamlit>=1.28.0
+pyyaml>=6.0
+
+# Additional dependencies for AI projects
+pandas>=2.0.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+
+# Development tools
+black>=25.1.0
+pytest>=8.4.1
+ruff>=0.12.2
