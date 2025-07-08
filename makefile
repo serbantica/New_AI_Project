@@ -60,8 +60,9 @@ test:
 
 # 🎯 Run Streamlit Project Charter Tool
 streamlit:
-	@echo "🎯 Starting AI Project Charter Tool..."
-	@. .venv/bin/activate && streamlit run streamlit_app.py --server.port=8501
+	@echo "🚀 Launching AI Project Charter Tool..."
+	@bash charter_tool/run_streamlit.sh
+
 
 # 📋 Show available commands
 help:
