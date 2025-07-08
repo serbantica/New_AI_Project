@@ -4,17 +4,14 @@ A Streamlit multi-page application for AI project planning and configuration
 """
 
 import streamlit as st
-import json
-import os
+from utils.functions import (
+    save_config_to_file, load_config_from_file, load_charter, save_charter
+)
+from chat.agent import llm_chat_agent, multi_agent_chat
 from datetime import datetime
 from typing import Dict, List, Any
-
-# Try to import yaml, use json as fallback
-try:
-    import yaml
-    HAS_YAML = True
-except ImportError:
-    HAS_YAML = False
+import os
+import json
 
 # Configure the page
 st.set_page_config(
@@ -24,69 +21,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Utility functions
-def save_config_to_file():
-    """Save current configuration to configs directory"""
-    os.makedirs("configs", exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"configs/project_config_{timestamp}.json"
-    
-    with open(filename, 'w') as f:
-        json.dump(st.session_state.project_config, f, indent=2, default=str)
-    
-    return filename
-
-def load_config_from_file(filename):
-    """Load configuration from file"""
-    try:
-        with open(filename, 'r') as f:
-            config = json.load(f)
-        st.session_state.project_config.update(config)
-        return True
-    except Exception as e:
-        st.error(f"Error loading config: {e}")
-        return False
-
-def generate_ai_response(prompt: str) -> str:
-    """Generate AI-like response based on prompt keywords"""
-    prompt_lower = prompt.lower()
-    
-    if any(word in prompt_lower for word in ['problem', 'solve', 'issue']):
-        return "Great! Understanding the problem is crucial. Can you be more specific about the current pain points and what metrics you'd use to measure success?"
-    
-    elif any(word in prompt_lower for word in ['user', 'customer', 'people']):
-        return "User analysis is key! Tell me more about their technical skills and how they currently handle this process. Are they technical or non-technical users?"
-    
-    elif any(word in prompt_lower for word in ['interface', 'ui', 'interaction']):
-        return "Interface design is important! Are you thinking of a chat interface, web dashboard, API, or something else? What would work best for your users?"
-    
-    elif any(word in prompt_lower for word in ['architecture', 'system', 'components']):
-        return "Let's break down the system architecture. What specialized functions do you need? Think about data processing, analysis, storage, and user interface components."
-    
-    elif any(word in prompt_lower for word in ['budget', 'cost', 'constraint']):
-        return "Constraints help guide technical decisions. What's your budget, performance requirements, and any compliance needs like GDPR or security standards?"
-    
-    elif any(word in prompt_lower for word in ['timeline', 'schedule', 'deadline']):
-        return "Timeline planning is crucial! What's your target go-live date? Should we plan for phases like prototype, development, testing, and deployment?"
-    
-    else:
-        return "That's an interesting point! Can you elaborate on how this fits into your overall project goals? I'm here to help you structure your AI project effectively."
-
-def update_config_from_chat(prompt: str):
-    """Update project configuration based on chat content"""
-    # Simple keyword-based extraction
-    prompt_lower = prompt.lower()
-    
-    # Extract project name
-    if 'project' in prompt_lower and 'name' in prompt_lower:
-        # Simple extraction - could be improved with NLP
-        pass
-    
-    # Store chat history
-    st.session_state.project_config['chat_history'].append({
-        'timestamp': datetime.now().isoformat(),
-        'content': prompt
-    })
+from utils.functions import save_config_to_file, load_config_from_file, load_charter, save_charter
+from chat.agent import llm_chat_agent, multi_agent_chat
 
 def validate_configuration(config: Dict) -> Dict:
     """Validate the current configuration"""
@@ -384,18 +320,53 @@ if 'current_section' not in st.session_state:
     st.session_state.current_section = 'dashboard'
 
 # Sidebar Navigation
+import pathlib
+
+# Read charter_template.md once at startup
+CHARTER_TEMPLATE_PATH = pathlib.Path(__file__).parent.parent / "charter_template.md"
+if 'charter_template_content' not in st.session_state:
+    try:
+        with open(CHARTER_TEMPLATE_PATH, "r") as f:
+            st.session_state['charter_template_content'] = f.read()
+    except Exception:
+        st.session_state['charter_template_content'] = ""
+
 with st.sidebar:
     st.title("🎯 AI Project Charter")
-    
+
+
+    # Model selection
+    st.subheader("🤖 LLM Model")
+    model_options = {
+        "Qwen2-7B-Instruct": "Qwen/Qwen2-7B-Instruct",
+        "Llama-3-8B-Instruct": "meta-llama/Llama-3-8B-Instruct"
+    }
+    default_model = "Qwen2-7B-Instruct"
+    selected_model_label = st.radio(
+        "Choose LLM model:",
+        list(model_options.keys()),
+        index=0,
+        key="llm_model_radio"
+    )
+    st.session_state["llm_model"] = model_options[selected_model_label]
+
+    # Charter template context toggle
+    st.subheader("📄 Charter Template Context")
+    use_charter_context = st.checkbox(
+        "Use charter_template.md as LLM context",
+        value=True,
+        key="use_charter_context"
+    )
+
     # Navigation
     page = st.selectbox(
         "Navigate to:",
         ["Dashboard", "Interactive Chat", "Configuration", "Export & Deploy"],
         key="navigation"
     )
-    
+
     st.divider()
-    
+
     # Progress tracking
     st.subheader("📊 Progress")
     progress_sections = [
@@ -407,13 +378,13 @@ with st.sidebar:
         "Success Metrics",
         "Timeline"
     ]
-    
+
     for section in progress_sections:
         status = st.session_state.project_config.get('completion_status', {}).get(section, False)
         st.write(f"{'✅' if status else '⏳'} {section}")
-    
+
     st.divider()
-    
+
     # Quick actions
     st.subheader("🚀 Quick Actions")
     if st.button("Reset Project"):
@@ -431,12 +402,12 @@ with st.sidebar:
             'completion_status': {}
         }
         st.rerun()
-    
+
     if st.button("Save Progress"):
-        save_config_to_file()
+        save_config_to_file(st.session_state.project_config)
         st.success("Progress saved!")
 
-# Main content based on navigation
+## Main content based on navigation
 if page == "Dashboard":
     st.title("🎯 AI Project Dashboard")
     
@@ -636,82 +607,64 @@ if page == "Dashboard":
 
 elif page == "Interactive Chat":
     st.title("🤖 Interactive Project Planning Chat")
-    
-    # Chat interface for guided project planning
     chat_container = st.container()
-    
-    # Predefined questions based on charter template
-    planning_questions = {
-        "Problem Definition": [
-            "What specific inefficiency are you solving?",
-            "What are the current pain points in your process?",
-            "What quantifiable change will this system bring?",
-            "How does this align with your organizational objectives?"
-        ],
-        "User Analysis": [
-            "Who will directly interact with the system?",
-            "Are your users technical or non-technical?",
-            "How do users currently solve this problem?",
-            "How often will users interact with the system?"
-        ],
-        "Interaction Design": [
-            "What should be the primary interface - chat, API, or dashboard?",
-            "Do you need real-time responses or batch processing?",
-            "How should results be delivered to users?",
-            "What external systems need to connect?"
-        ],
-        "Architecture": [
-            "What specialized functions are needed?",
-            "What data sources will the system process?",
-            "What analysis or transformation is required?",
-            "How many users will the system handle?"
-        ],
-        "Constraints": [
-            "What's the maximum monthly operational cost?",
-            "What regulations must be followed?",
-            "What response times are acceptable?",
-            "What uptime is required?"
-        ]
-    }
-    
     col1, col2 = st.columns([3, 1])
-    
     with col1:
-        # Display chat history
         for message in st.session_state.chat_messages:
             with st.chat_message(message["role"]):
                 st.write(message["content"])
-        
-        # Chat input
         if prompt := st.chat_input("Ask about your project or answer the questions..."):
-            # Add user message
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
-            
-            # Simple AI-like response based on keywords
-            ai_response = generate_ai_response(prompt)
+            # Pass selected model and charter context to the agent
+            model_name = st.session_state.get("llm_model", "Qwen/Qwen2-7B-Instruct")
+            charter_context = st.session_state['charter_template_content'] if st.session_state.get('use_charter_context', True) else None
+            ai_response = llm_chat_agent(prompt, history=None, model_name=model_name, system_context=charter_context)
             st.session_state.chat_messages.append({"role": "assistant", "content": ai_response})
-            
-            # Update project config based on chat
-            update_config_from_chat(prompt)
-            
             st.rerun()
-    
     with col2:
         st.subheader("💡 Guided Questions")
-        
+        planning_questions = {
+            "Problem Definition": [
+                "What specific inefficiency are you solving?",
+                "What are the current pain points in your process?",
+                "What quantifiable change will this system bring?",
+                "How does this align with your organizational objectives?"
+            ],
+            "User Analysis": [
+                "Who will directly interact with the system?",
+                "Are your users technical or non-technical?",
+                "How do users currently solve this problem?",
+                "How often will users interact with the system?"
+            ],
+            "Interaction Design": [
+                "What should be the primary interface - chat, API, or dashboard?",
+                "Do you need real-time responses or batch processing?",
+                "How should results be delivered to users?",
+                "What external systems need to connect?"
+            ],
+            "Architecture": [
+                "What specialized functions are needed?",
+                "What data sources will the system process?",
+                "What analysis or transformation is required?",
+                "How many users will the system handle?"
+            ],
+            "Constraints": [
+                "What's the maximum monthly operational cost?",
+                "What regulations must be followed?",
+                "What response times are acceptable?",
+                "What uptime is required?"
+            ]
+        }
         selected_category = st.selectbox(
             "Question Category",
             list(planning_questions.keys())
         )
-        
         st.write(f"**{selected_category} Questions:**")
         for i, question in enumerate(planning_questions[selected_category]):
             if st.button(f"Q{i+1}: {question[:30]}...", key=f"q_{selected_category}_{i}"):
                 st.session_state.chat_messages.append({"role": "assistant", "content": question})
                 st.rerun()
-        
         st.divider()
-        
         if st.button("Clear Chat"):
             st.session_state.chat_messages = []
             st.rerun()
@@ -838,314 +791,5 @@ elif page == "Export & Deploy":
         
         # Save final configuration
         if st.button("💾 Save Final Configuration"):
-            filename = save_config_to_file()
+            filename = save_config_to_file(st.session_state.project_config)
             st.success(f"Configuration saved to {filename}")
-            
-            # Also save as YAML if available
-            if HAS_YAML:
-                import yaml  # Import here to avoid error if not available
-                yaml_filename = filename.replace('.json', '.yaml')
-                with open(yaml_filename, 'w') as f:
-                    yaml.dump(st.session_state.project_config, f, default_flow_style=False)
-                st.success(f"YAML configuration saved to {yaml_filename}")
-
-def generate_ai_response(prompt: str) -> str:
-    """Generate AI-like response based on prompt keywords"""
-    prompt_lower = prompt.lower()
-    
-    if any(word in prompt_lower for word in ['problem', 'solve', 'issue']):
-        return "Great! Understanding the problem is crucial. Can you be more specific about the current pain points and what metrics you'd use to measure success?"
-    
-    elif any(word in prompt_lower for word in ['user', 'customer', 'people']):
-        return "User analysis is key! Tell me more about their technical skills and how they currently handle this process. Are they technical or non-technical users?"
-    
-    elif any(word in prompt_lower for word in ['interface', 'ui', 'interaction']):
-        return "Interface design is important! Are you thinking of a chat interface, web dashboard, API, or something else? What would work best for your users?"
-    
-    elif any(word in prompt_lower for word in ['architecture', 'system', 'components']):
-        return "Let's break down the system architecture. What specialized functions do you need? Think about data processing, analysis, storage, and user interface components."
-    
-    elif any(word in prompt_lower for word in ['budget', 'cost', 'constraint']):
-        return "Constraints help guide technical decisions. What's your budget, performance requirements, and any compliance needs like GDPR or security standards?"
-    
-    elif any(word in prompt_lower for word in ['timeline', 'schedule', 'deadline']):
-        return "Timeline planning is crucial! What's your target go-live date? Should we plan for phases like prototype, development, testing, and deployment?"
-    
-    else:
-        return "That's an interesting point! Can you elaborate on how this fits into your overall project goals? I'm here to help you structure your AI project effectively."
-
-def update_config_from_chat(prompt: str):
-    """Update project configuration based on chat content"""
-    # Simple keyword-based extraction
-    prompt_lower = prompt.lower()
-    
-    # Extract project name
-    if 'project' in prompt_lower and 'name' in prompt_lower:
-        # Simple extraction - could be improved with NLP
-        pass
-    
-    # Store chat history
-    st.session_state.project_config['chat_history'].append({
-        'timestamp': datetime.now().isoformat(),
-        'content': prompt
-    })
-
-def validate_configuration(config: Dict) -> Dict:
-    """Validate the current configuration"""
-    results = {}
-    
-    # Project name validation
-    if config.get('project_name'):
-        results['Project Name'] = {'valid': True, 'message': 'Project name is set'}
-    else:
-        results['Project Name'] = {'valid': False, 'message': 'Project name is required'}
-    
-    # Problem statement validation
-    if config.get('problem_statement') and len(config['problem_statement']) > 20:
-        results['Problem Statement'] = {'valid': True, 'message': 'Problem statement is detailed'}
-    else:
-        results['Problem Statement'] = {'valid': False, 'message': 'Problem statement needs more detail'}
-    
-    # Users validation
-    if config.get('users'):
-        results['Users'] = {'valid': True, 'message': f"{len(config['users'])} user types defined"}
-    else:
-        results['Users'] = {'valid': False, 'message': 'User types need to be defined'}
-    
-    # Architecture validation
-    if config.get('system_components') and len(config['system_components']) >= 3:
-        results['Architecture'] = {'valid': True, 'message': 'System components are defined'}
-    else:
-        results['Architecture'] = {'valid': False, 'message': 'Need at least 3 system components'}
-    
-    return results
-
-def generate_project_charter() -> str:
-    """Generate project charter based on current configuration"""
-    config = st.session_state.project_config
-    
-    charter = f"""# {config.get('project_name', 'AI Project')} Charter
-
-## Project Overview
-**Problem Statement:** {config.get('problem_statement', 'Not defined')}
-
-## User Analysis
-**Target Users:** {', '.join(config.get('users', []))}
-**Interaction Patterns:** {', '.join(config.get('interaction_patterns', []))}
-
-## System Architecture
-**Components:** {', '.join(config.get('system_components', []))}
-**Technology Stack:** {config.get('tech_stack', 'Not defined')}
-
-## Constraints
-**Budget:** €{config.get('constraints', {}).get('budget', 0)}/month
-**Performance:** {config.get('constraints', {}).get('performance', 'Not defined')}
-**Compliance:** {', '.join(config.get('constraints', {}).get('compliance', []))}
-
-## Success Metrics
-**Efficiency Gain:** {config.get('success_metrics', {}).get('efficiency_gain', 0)}%
-**Accuracy Target:** {config.get('success_metrics', {}).get('accuracy_target', 0)}%
-**User Adoption:** {config.get('success_metrics', {}).get('user_adoption', 0)} users
-
-## Timeline
-**Start Date:** {config.get('timeline', {}).get('start_date', 'Not defined')}
-**End Date:** {config.get('timeline', {}).get('end_date', 'Not defined')}
-**Phases:** {', '.join(config.get('timeline', {}).get('phases', []))}
-
-Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-    
-    return charter
-
-def generate_technical_spec() -> str:
-    """Generate technical specification"""
-    config = st.session_state.project_config
-    
-    spec = f"""# {config.get('project_name', 'AI Project')} Technical Specification
-
-## System Requirements
-- **Performance:** {config.get('constraints', {}).get('performance', 'Not defined')} response time
-- **Scalability:** Support for {config.get('success_metrics', {}).get('user_adoption', 0)} concurrent users
-- **Availability:** 99.9% uptime target
-
-## Architecture Components
-"""
-    
-    for component in config.get('system_components', []):
-        spec += f"- **{component}:** Implementation details to be defined\n"
-    
-    spec += f"""
-## Technology Stack
-- **Primary:** {config.get('tech_stack', 'Python + FastAPI')}
-- **Database:** To be determined based on data requirements
-- **Deployment:** {config.get('deployment_type', 'Cloud Platform')}
-
-## Integration Points
-"""
-    
-    for pattern in config.get('interaction_patterns', []):
-        spec += f"- **{pattern}:** API endpoints and data flow to be defined\n"
-    
-    spec += f"""
-## Security Requirements
-- **Compliance:** {', '.join(config.get('constraints', {}).get('compliance', ['Standard security practices']))}
-- **Authentication:** User authentication and authorization
-- **Data Protection:** Encryption in transit and at rest
-
-Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-    
-    return spec
-
-def generate_python_config() -> str:
-    """Generate Python configuration file"""
-    config = st.session_state.project_config
-    
-    python_config = f'''"""
-Configuration file for {config.get('project_name', 'AI Project')}
-Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
-
-from typing import List, Dict, Any
-from dataclasses import dataclass
-from datetime import datetime
-
-@dataclass
-class ProjectConfig:
-    """Project configuration settings"""
-    
-    # Basic project info
-    PROJECT_NAME: str = "{config.get('project_name', 'ai-project')}"
-    PROBLEM_STATEMENT: str = "{config.get('problem_statement', '')}"
-    
-    # User configuration
-    TARGET_USERS: List[str] = {config.get('users', [])}
-    INTERACTION_PATTERNS: List[str] = {config.get('interaction_patterns', [])}
-    
-    # System architecture
-    SYSTEM_COMPONENTS: List[str] = {config.get('system_components', [])}
-    TECH_STACK: str = "{config.get('tech_stack', 'Python + FastAPI')}"
-    
-    # Constraints
-    MONTHLY_BUDGET: float = {config.get('constraints', {}).get('budget', 500)}
-    PERFORMANCE_REQUIREMENT: str = "{config.get('constraints', {}).get('performance', '< 2 sec')}"
-    COMPLIANCE_REQUIREMENTS: List[str] = {config.get('constraints', {}).get('compliance', [])}
-    
-    # Success metrics
-    EFFICIENCY_GAIN_TARGET: int = {config.get('success_metrics', {}).get('efficiency_gain', 50)}
-    ACCURACY_TARGET: int = {config.get('success_metrics', {}).get('accuracy_target', 95)}
-    USER_ADOPTION_TARGET: int = {config.get('success_metrics', {}).get('user_adoption', 50)}
-    
-    # Timeline
-    START_DATE: str = "{config.get('timeline', {}).get('start_date', '')}"
-    END_DATE: str = "{config.get('timeline', {}).get('end_date', '')}"
-    PROJECT_PHASES: List[str] = {config.get('timeline', {}).get('phases', [])}
-
-# Global configuration instance
-config = ProjectConfig()
-
-# Environment-specific settings
-DEVELOPMENT = {{
-    "DEBUG": True,
-    "DATABASE_URL": "sqlite:///dev.db",
-    "LOG_LEVEL": "DEBUG"
-}}
-
-PRODUCTION = {{
-    "DEBUG": False,
-    "DATABASE_URL": "postgresql://user:pass@localhost/prod",
-    "LOG_LEVEL": "INFO"
-}}
-
-# Feature flags
-FEATURES = {{
-    "ENABLE_CHAT": True,
-    "ENABLE_DASHBOARD": True,
-    "ENABLE_API": True,
-    "ENABLE_MONITORING": True
-}}
-'''
-    
-    return python_config
-
-def generate_dockerfile() -> str:
-    """Generate Dockerfile for containerization"""
-    config = st.session_state.project_config
-    
-    dockerfile = f"""# Dockerfile for {config.get('project_name', 'AI Project')}
-FROM python:3.11-slim
-
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \\
-    gcc \\
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run application
-CMD ["python", "main.py"]
-"""
-    
-    return dockerfile
-
-def generate_requirements() -> str:
-    """Generate requirements.txt file"""
-    config = st.session_state.project_config
-    
-    requirements = """# Core dependencies
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
-
-# Web framework
-fastapi>=0.100.0
-uvicorn>=0.20.0
-
-# Database
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.0
-
-# AI/ML libraries
-openai>=1.0.0
-langchain>=0.1.0
-huggingface-hub>=0.16.0
-
-# Utilities
-python-dotenv>=1.0.0
-pydantic>=2.0.0
-requests>=2.31.0
-pyyaml>=6.0
-
-# Development tools
-pytest>=7.0.0
-black>=23.0.0
-ruff>=0.1.0
-
-# Monitoring
-prometheus-client>=0.17.0
-"""
-    
-    return requirements
-
-if __name__ == "__main__":
-    # This will run when the script is executed directly
-    pass

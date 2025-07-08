@@ -98,7 +98,14 @@ __pypackages__/
 
 # Celery stuff
 celerybeat-schedule
-celerybeat.pid
+
+# User-specific
+.venv/
+configs/
+docs/
+*.db
+*.sqlite3
+.streamlit/
 
 # SageMath parsed files
 *.sage.py
